@@ -32,7 +32,7 @@
 
     // Converts "YYYY-MM-DD" → "Month Day, Year"
     // We split manually instead of using `new Date()` to avoid timezone
-    // offset issues that can shift the date back by one day.
+  
     function formatDate(dateStr) {
       const [year, month, day] = dateStr.split("-").map(Number);
       const date = new Date(year, month - 1, day); // local midnight — no offset shift
