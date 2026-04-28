@@ -3,8 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>bobaigwa - Task 1 (Refactored)</title>
+  <title>bobaigwa - Task 1 (Final Improved Version)</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    .article-card {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 6px;
+      background: #f9f9f9;
+    }
+
+    .meta {
+      font-size: 0.9em;
+      color: #555;
+    }
+
+    #summary {
+      margin: 10px 0;
+      font-weight: bold;
+    }
+
+    .empty {
+      color: #888;
+      font-style: italic;
+    }
+  </style>
 </head>
+
 <body>
 
   <h1>bobaigwa - Task 1</h1>
@@ -16,6 +47,7 @@
     <option value="oldest">Oldest First</option>
   </select>
 
+  <div id="summary"></div>
   <div id="results"></div>
 
   <script>
@@ -38,8 +70,9 @@
     /* ── DOM REFERENCES ─────────────────────────────────── */
     const resultsDiv = document.getElementById("results");
     const sortSelect = document.getElementById("sort");
+    const summaryDiv = document.getElementById("summary");
 
-    /* ── UTILITIES ───────────────────────────────────────── */
+    /* ── UTILITIES (Validation + Formatting + Sorting) ─── */
 
     function formatDate(dateStr) {
       const [year, month, day] = dateStr.split("-").map(Number);
@@ -62,49 +95,59 @@
       );
     }
 
-    function sortData(data, order) {
-      return [...data].sort((a, b) => {
+    function sortData(list, order) {
+      return [...list].sort((a, b) => {
         const dateA = new Date(a.creation_date);
         const dateB = new Date(b.creation_date);
-
         return order === "newest" ? dateB - dateA : dateA - dateB;
       });
     }
 
-    /* ── DOM CREATION ───────────────────────────────────── */
+    /* ── UI CREATION (Refactored DOM logic) ─────────────── */
 
-    function createArticleElement(article) {
-      const p = document.createElement("p");
+    function createArticleCard(article) {
+      const div = document.createElement("div");
+      div.className = "article-card";
 
-      p.textContent =
-        `Article "${article.title}" (Page ID ${article.page_id}) was created at ${formatDate(article.creation_date)}.`;
+      div.innerHTML = `
+        <div><strong>${article.title}</strong></div>
+        <div class="meta">Page ID: ${article.page_id}</div>
+        <div class="meta">Created: ${formatDate(article.creation_date)}</div>
+      `;
 
-      return p;
+      return div;
     }
 
-    /* ── RENDER LOGIC ───────────────────────────────────── */
+    /* ── RENDERING LOGIC ───────────────────────────────── */
 
-    function clearResults() {
+    function clearUI() {
       resultsDiv.innerHTML = "";
+      summaryDiv.innerHTML = "";
     }
 
     function showEmptyState() {
-      resultsDiv.textContent = "No valid articles to display.";
+      resultsDiv.innerHTML = "<div class='empty'>No valid articles to display.</div>";
+    }
+
+    function updateSummary(count) {
+      summaryDiv.textContent = `Showing ${count} article(s)`;
     }
 
     function renderArticles(list) {
-      clearResults();
+      clearUI();
 
       const validArticles = list.filter(isValidArticle);
 
-      validArticles.forEach(article => {
-        const element = createArticleElement(article);
-        resultsDiv.appendChild(element);
-      });
-
       if (validArticles.length === 0) {
         showEmptyState();
+        return;
       }
+
+      validArticles.forEach(article => {
+        resultsDiv.appendChild(createArticleCard(article));
+      });
+
+      updateSummary(validArticles.length);
     }
 
     /* ── CONTROLLER ─────────────────────────────────────── */
@@ -114,7 +157,7 @@
       renderArticles(sorted);
     }
 
-    /* ── INITIALIZATION ─────────────────────────────────── */
+    /* ── INIT ───────────────────────────────────────────── */
 
     function init() {
       sortSelect.addEventListener("change", updateView);
