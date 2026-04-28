@@ -1,6 +1,7 @@
 import csv
 import requests
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 CSV_FILE = "Task 2 - Intern.csv"
@@ -39,21 +40,12 @@ def get_status_code(url):
         status, error = fetch_url(url)
 
         if status is not None:
-            return {
-                "url": url,
-                "status": status,
-                "error": ""
-            }
+            return {"url": url, "status": status, "error": ""}
 
-        # retry only if not last attempt
         if attempt < MAX_RETRIES:
-            time.sleep(1)  # small delay before retry
+            time.sleep(1)
         else:
-            return {
-                "url": url,
-                "status": "",
-                "error": error
-            }
+            return {"url": url, "status": "", "error": error}
 
 
 def read_urls():
@@ -76,11 +68,33 @@ def read_urls():
 def save_results(results):
     with open(OUTPUT_FILE, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-
         writer.writerow(["URL", "Status Code", "Error"])
 
         for r in results:
             writer.writerow([r["url"], r["status"], r["error"]])
+
+
+def print_summary(results):
+    total = len(results)
+    success = sum(1 for r in results if r["status"])
+    failed = total - success
+
+    status_counter = Counter(r["status"] for r in results if r["status"])
+    error_counter = Counter(r["error"] for r in results if r["error"])
+
+    print("\n===== SUMMARY =====")
+    print(f"Total URLs: {total}")
+    print(f"Successful: {success}")
+    print(f"Failed: {failed}")
+
+    print("\nStatus Code Breakdown:")
+    for code, count in status_counter.items():
+        print(f"{code}: {count}")
+
+    if error_counter:
+        print("\nError Breakdown:")
+        for err, count in error_counter.items():
+            print(f"{err}: {count}")
 
 
 def main():
@@ -100,6 +114,7 @@ def main():
                 print(f"({result['status']}) {result['url']}")
 
     save_results(results)
+    print_summary(results)
 
 
 if __name__ == "__main__":
