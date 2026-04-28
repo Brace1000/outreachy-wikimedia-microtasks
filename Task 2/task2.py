@@ -1,12 +1,14 @@
 import csv
 import requests
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 CSV_FILE = "Task 2 - Intern.csv"
 OUTPUT_FILE = "results.csv"
+MAX_RETRIES = 3
 
 
-def get_status_code(url):
+def fetch_url(url):
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (compatible; OutreachyBot/1.0; "
@@ -20,20 +22,38 @@ def get_status_code(url):
         if response.status_code == 405:
             response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
 
-        return {
-            "url": url,
-            "status": response.status_code,
-            "error": ""
-        }
+        return response.status_code, ""
 
     except requests.exceptions.ConnectionError:
-        return {"url": url, "status": "", "error": "Connection failed"}
+        return None, "Connection failed"
 
     except requests.exceptions.Timeout:
-        return {"url": url, "status": "", "error": "Timeout"}
+        return None, "Timeout"
 
     except requests.exceptions.RequestException as e:
-        return {"url": url, "status": "", "error": str(e)}
+        return None, str(e)
+
+
+def get_status_code(url):
+    for attempt in range(1, MAX_RETRIES + 1):
+        status, error = fetch_url(url)
+
+        if status is not None:
+            return {
+                "url": url,
+                "status": status,
+                "error": ""
+            }
+
+        # retry only if not last attempt
+        if attempt < MAX_RETRIES:
+            time.sleep(1)  # small delay before retry
+        else:
+            return {
+                "url": url,
+                "status": "",
+                "error": error
+            }
 
 
 def read_urls():
@@ -57,7 +77,6 @@ def save_results(results):
     with open(OUTPUT_FILE, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
 
-        # header
         writer.writerow(["URL", "Status Code", "Error"])
 
         for r in results:
@@ -75,13 +94,11 @@ def main():
             result = future.result()
             results.append(result)
 
-            # console output
             if result["error"]:
                 print(f"(ERROR: {result['error']}) {result['url']}")
             else:
                 print(f"({result['status']}) {result['url']}")
 
-    # save to CSV
     save_results(results)
 
 
