@@ -1,12 +1,25 @@
 import csv
 import requests
 import time
+import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 CSV_FILE = "Task 2 - Intern.csv"
 OUTPUT_FILE = "results.csv"
+LOG_FILE = "app.log"
 MAX_RETRIES = 3
+
+
+# 🔹 Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler()
+    ]
+)
 
 
 def fetch_url(url):
@@ -40,11 +53,13 @@ def get_status_code(url):
         status, error = fetch_url(url)
 
         if status is not None:
+            logging.info(f"{status} - {url}")
             return {"url": url, "status": status, "error": ""}
 
         if attempt < MAX_RETRIES:
             time.sleep(1)
         else:
+            logging.error(f"{error} - {url}")
             return {"url": url, "status": "", "error": error}
 
 
@@ -62,6 +77,7 @@ def read_urls():
             if url.startswith("http"):
                 urls.append(url)
 
+    logging.info(f"Loaded {len(urls)} URLs from CSV")
     return urls
 
 
@@ -73,6 +89,8 @@ def save_results(results):
         for r in results:
             writer.writerow([r["url"], r["status"], r["error"]])
 
+    logging.info(f"Results saved to {OUTPUT_FILE}")
+
 
 def print_summary(results):
     total = len(results)
@@ -82,19 +100,19 @@ def print_summary(results):
     status_counter = Counter(r["status"] for r in results if r["status"])
     error_counter = Counter(r["error"] for r in results if r["error"])
 
-    print("\n===== SUMMARY =====")
-    print(f"Total URLs: {total}")
-    print(f"Successful: {success}")
-    print(f"Failed: {failed}")
+    logging.info("===== SUMMARY =====")
+    logging.info(f"Total URLs: {total}")
+    logging.info(f"Successful: {success}")
+    logging.info(f"Failed: {failed}")
 
-    print("\nStatus Code Breakdown:")
+    logging.info("Status Code Breakdown:")
     for code, count in status_counter.items():
-        print(f"{code}: {count}")
+        logging.info(f"{code}: {count}")
 
     if error_counter:
-        print("\nError Breakdown:")
+        logging.info("Error Breakdown:")
         for err, count in error_counter.items():
-            print(f"{err}: {count}")
+            logging.info(f"{err}: {count}")
 
 
 def main():
@@ -107,11 +125,6 @@ def main():
         for future in as_completed(futures):
             result = future.result()
             results.append(result)
-
-            if result["error"]:
-                print(f"(ERROR: {result['error']}) {result['url']}")
-            else:
-                print(f"({result['status']}) {result['url']}")
 
     save_results(results)
     print_summary(results)
