@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>bobaigwa - Task 1 (Sorting Added)</title>
+  <title>bobaigwa - Task 1 (Sorting + Validation)</title>
 </head>
 <body>
 
   <h1>bobaigwa - Task 1</h1>
 
-  <!-- NEW: Sorting Control -->
+  <!-- Sorting Control -->
   <label for="sort">Sort by date: </label>
   <select id="sort">
     <option value="newest">Newest First</option>
@@ -46,7 +46,18 @@
       });
     }
 
-    /* ── SORTING FUNCTION (NEW) ─────────────────────────── */
+    /* ── DATA VALIDATION (NEW - Contribution 5) ─────────── */
+    function isValidArticle(article) {
+      return (
+        article &&
+        typeof article.title === "string" &&
+        typeof article.page_id === "number" &&
+        typeof article.creation_date === "string" &&
+        article.creation_date.includes("-")
+      );
+    }
+
+    /* ── SORTING FUNCTION (Contribution 4) ─────────────── */
     function sortData(data, order) {
       return [...data].sort((a, b) => {
         const dateA = new Date(a.creation_date);
@@ -62,6 +73,12 @@
       resultsDiv.innerHTML = "";
 
       data.forEach(article => {
+        // Apply validation
+        if (!isValidArticle(article)) {
+          console.warn("Invalid article skipped:", article);
+          return;
+        }
+
         const formattedDate = formatDate(article.creation_date);
 
         const p = document.createElement("p");
@@ -70,9 +87,14 @@
 
         resultsDiv.appendChild(p);
       });
+
+      // Fallback if no valid data
+      if (resultsDiv.children.length === 0) {
+        resultsDiv.textContent = "No valid articles to display.";
+      }
     }
 
-    /* ── EVENT HANDLING (NEW) ───────────────────────────── */
+    /* ── EVENT HANDLING ────────────────────────────────── */
     const sortSelect = document.getElementById("sort");
 
     function updateView() {
