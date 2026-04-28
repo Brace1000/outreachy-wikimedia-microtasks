@@ -1,41 +1,16 @@
 import csv
 import requests
-import time
-import logging
-import argparse
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import Counter
+import time
 
-DEFAULT_INPUT = "Task 2 - Intern.csv"
-DEFAULT_OUTPUT = "results.csv"
-LOG_FILE = "app.log"
-DEFAULT_RETRIES = 3
-DEFAULT_THREADS = 10
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="URL Status Checker")
-
-    parser.add_argument("--input", default=DEFAULT_INPUT, help="Input CSV file")
-    parser.add_argument("--output", default=DEFAULT_OUTPUT, help="Output CSV file")
-    parser.add_argument("--threads", type=int, default=DEFAULT_THREADS, help="Number of threads")
-    parser.add_argument("--retries", type=int, default=DEFAULT_RETRIES, help="Retry attempts")
-
-    return parser.parse_args()
+CSV_FILE = "Task 2 - Intern.csv"
+MAX_RETRIES = 2
+TIMEOUT = 10
+MAX_WORKERS = 10
 
 
-def setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(LOG_FILE),
-            logging.StreamHandler()
-        ]
-    )
-
-
-def fetch_url(url):
+def fetch_url(session, url):
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (compatible; OutreachyBot/1.0; "
@@ -44,43 +19,40 @@ def fetch_url(url):
     }
 
     try:
-        response = requests.head(url, headers=headers, timeout=10, allow_redirects=True)
+        response = session.head(url, headers=headers, timeout=TIMEOUT, allow_redirects=True)
 
         if response.status_code == 405:
-            response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+            response = session.get(url, headers=headers, timeout=TIMEOUT, allow_redirects=True)
 
-        return response.status_code, ""
-
-    except requests.exceptions.ConnectionError:
-        return None, "Connection failed"
+        return response.status_code
 
     except requests.exceptions.Timeout:
-        return None, "Timeout"
-
-    except requests.exceptions.RequestException as e:
-        return None, str(e)
-
-
-def get_status_code(url, retries):
-    for attempt in range(1, retries + 1):
-        status, error = fetch_url(url)
-
-        if status is not None:
-            logging.info(f"{status} - {url}")
-            return {"url": url, "status": status, "error": ""}
-
-        if attempt < retries:
-            time.sleep(1)
-        else:
-            logging.error(f"{error} - {url}")
-            return {"url": url, "status": "", "error": error}
+        return "TIMEOUT"
+    except requests.exceptions.ConnectionError:
+        return "CONNECTION_ERROR"
+    except requests.exceptions.RequestException:
+        return "REQUEST_ERROR"
 
 
-def read_urls(input_file):
+def get_status_with_retry(session, url):
+    for attempt in range(MAX_RETRIES + 1):
+        result = fetch_url(session, url)
+
+        if isinstance(result, int):
+            return result
+
+        if attempt < MAX_RETRIES:
+            time.sleep(1)  # simple backoff
+
+    return result  # final error after retries
+
+
+def read_urls(file_path):
     urls = []
 
-    with open(input_file, newline="", encoding="utf-8") as csvfile:
+    with open(file_path, newline="", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile)
+
         for row in reader:
             if not row:
                 continue
@@ -90,72 +62,53 @@ def read_urls(input_file):
             if url.startswith("http"):
                 urls.append(url)
 
-    logging.info(f"Loaded {len(urls)} URLs from {input_file}")
     return urls
 
 
-def save_results(results, output_file):
-    with open(output_file, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(["URL", "Status Code", "Error"])
+def process_urls(urls):
+    results = []
 
-        for r in results:
-            writer.writerow([r["url"], r["status"], r["error"]])
+    with requests.Session() as session:
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(get_status_with_retry, session, url): url
+                for url in urls
+            }
 
-    logging.info(f"Results saved to {output_file}")
+            for future in as_completed(futures):
+                url = futures[future]
+                status = future.result()
+
+                results.append((status, url))
+                print(f"({status}) {url}")
+
+    return results
 
 
-def print_summary(results):
-    total = len(results)
-    success = sum(1 for r in results if r["status"])
-    failed = total - success
+def summarize_results(results):
+    counter = Counter()
 
-    status_counter = Counter(r["status"] for r in results if r["status"])
-    error_counter = Counter(r["error"] for r in results if r["error"])
+    for status, _ in results:
+        counter[status] += 1
 
-    logging.info("===== SUMMARY =====")
-    logging.info(f"Total URLs: {total}")
-    logging.info(f"Successful: {success}")
-    logging.info(f"Failed: {failed}")
+    print("\n📊 Summary Report")
+    print("-" * 30)
 
-    logging.info("Status Code Breakdown:")
-    for code, count in status_counter.items():
-        logging.info(f"{code}: {count}")
+    total = sum(counter.values())
+    print(f"Total URLs: {total}")
 
-    if error_counter:
-        logging.info("Error Breakdown:")
-        for err, count in error_counter.items():
-            logging.info(f"{err}: {count}")
+    for key, value in counter.items():
+        print(f"{key}: {value}")
 
 
 def main():
-    args = parse_args()
-    setup_logging()
+    urls = read_urls(CSV_FILE)
 
-    urls = read_urls(args.input)
-    results = []
-    total = len(urls)
-    completed = 0
+    print(f"Processing {len(urls)} URLs...\n")
 
-    with ThreadPoolExecutor(max_workers=args.threads) as executor:
-        futures = [
-            executor.submit(get_status_code, url, args.retries)
-            for url in urls
-        ]
+    results = process_urls(urls)
 
-        for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
-
-            completed += 1
-            progress = (completed / total) * 100
-
-            print(f"\rProcessed: {completed}/{total} ({progress:.1f}%)", end="")
-
-    print()  # newline after progress
-
-    save_results(results, args.output)
-    print_summary(results)
+    summarize_results(results)
 
 
 if __name__ == "__main__":
