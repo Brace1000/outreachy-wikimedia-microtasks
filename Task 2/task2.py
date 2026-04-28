@@ -2,24 +2,39 @@ import csv
 import requests
 import time
 import logging
+import argparse
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-CSV_FILE = "Task 2 - Intern.csv"
-OUTPUT_FILE = "results.csv"
+DEFAULT_INPUT = "Task 2 - Intern.csv"
+DEFAULT_OUTPUT = "results.csv"
 LOG_FILE = "app.log"
-MAX_RETRIES = 3
+DEFAULT_RETRIES = 3
+DEFAULT_THREADS = 10
 
 
-# 🔹 Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()
-    ]
-)
+# 🔹 CLI Arguments
+def parse_args():
+    parser = argparse.ArgumentParser(description="URL Status Checker")
+
+    parser.add_argument("--input", default=DEFAULT_INPUT, help="Input CSV file")
+    parser.add_argument("--output", default=DEFAULT_OUTPUT, help="Output CSV file")
+    parser.add_argument("--threads", type=int, default=DEFAULT_THREADS, help="Number of threads")
+    parser.add_argument("--retries", type=int, default=DEFAULT_RETRIES, help="Retry attempts")
+
+    return parser.parse_args()
+
+
+# 🔹 Logging setup
+def setup_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(LOG_FILE),
+            logging.StreamHandler()
+        ]
+    )
 
 
 def fetch_url(url):
@@ -48,25 +63,25 @@ def fetch_url(url):
         return None, str(e)
 
 
-def get_status_code(url):
-    for attempt in range(1, MAX_RETRIES + 1):
+def get_status_code(url, retries):
+    for attempt in range(1, retries + 1):
         status, error = fetch_url(url)
 
         if status is not None:
             logging.info(f"{status} - {url}")
             return {"url": url, "status": status, "error": ""}
 
-        if attempt < MAX_RETRIES:
+        if attempt < retries:
             time.sleep(1)
         else:
             logging.error(f"{error} - {url}")
             return {"url": url, "status": "", "error": error}
 
 
-def read_urls():
+def read_urls(input_file):
     urls = []
 
-    with open(CSV_FILE, newline="", encoding="utf-8") as csvfile:
+    with open(input_file, newline="", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             if not row:
@@ -77,19 +92,19 @@ def read_urls():
             if url.startswith("http"):
                 urls.append(url)
 
-    logging.info(f"Loaded {len(urls)} URLs from CSV")
+    logging.info(f"Loaded {len(urls)} URLs from {input_file}")
     return urls
 
 
-def save_results(results):
-    with open(OUTPUT_FILE, mode="w", newline="", encoding="utf-8") as file:
+def save_results(results, output_file):
+    with open(output_file, mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(["URL", "Status Code", "Error"])
 
         for r in results:
             writer.writerow([r["url"], r["status"], r["error"]])
 
-    logging.info(f"Results saved to {OUTPUT_FILE}")
+    logging.info(f"Results saved to {output_file}")
 
 
 def print_summary(results):
@@ -116,17 +131,22 @@ def print_summary(results):
 
 
 def main():
-    urls = read_urls()
+    args = parse_args()
+    setup_logging()
+
+    urls = read_urls(args.input)
     results = []
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(get_status_code, url) for url in urls]
+    with ThreadPoolExecutor(max_workers=args.threads) as executor:
+        futures = [
+            executor.submit(get_status_code, url, args.retries)
+            for url in urls
+        ]
 
         for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
+            results.append(future.result())
 
-    save_results(results)
+    save_results(results, args.output)
     print_summary(results)
 
 
