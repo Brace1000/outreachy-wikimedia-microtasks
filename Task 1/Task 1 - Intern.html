@@ -32,6 +32,7 @@
     .empty {
       color: #888;
       font-style: italic;
+      padding: 10px;
     }
   </style>
 </head>
@@ -72,7 +73,7 @@
     const sortSelect = document.getElementById("sort");
     const summaryDiv = document.getElementById("summary");
 
-    /* ── UTILITIES (Validation + Formatting + Sorting) ─── */
+    /* ── UTILITIES ───────────────────────────────────────── */
 
     function formatDate(dateStr) {
       const [year, month, day] = dateStr.split("-").map(Number);
@@ -103,7 +104,19 @@
       });
     }
 
-    /* ── UI CREATION (Refactored DOM logic) ─────────────── */
+    /* ── UI HELPERS ───────────────────────────────────────── */
+
+    function showLoading() {
+      resultsDiv.innerHTML = "<div class='empty'>Loading articles...</div>";
+    }
+
+    function showEmptyState() {
+      resultsDiv.innerHTML = "<div class='empty'>No valid articles to display.</div>";
+    }
+
+    function updateSummary(count) {
+      summaryDiv.textContent = `Showing ${count} article(s)`;
+    }
 
     function createArticleCard(article) {
       const div = document.createElement("div");
@@ -118,30 +131,18 @@
       return div;
     }
 
-    /* ── RENDERING LOGIC ───────────────────────────────── */
-
-    function clearUI() {
-      resultsDiv.innerHTML = "";
-      summaryDiv.innerHTML = "";
-    }
-
-    function showEmptyState() {
-      resultsDiv.innerHTML = "<div class='empty'>No valid articles to display.</div>";
-    }
-
-    function updateSummary(count) {
-      summaryDiv.textContent = `Showing ${count} article(s)`;
-    }
+    /* ── RENDERING ───────────────────────────────────────── */
 
     function renderArticles(list) {
-      clearUI();
-
       const validArticles = list.filter(isValidArticle);
 
       if (validArticles.length === 0) {
         showEmptyState();
+        updateSummary(0);
         return;
       }
+
+      resultsDiv.innerHTML = "";
 
       validArticles.forEach(article => {
         resultsDiv.appendChild(createArticleCard(article));
@@ -150,14 +151,18 @@
       updateSummary(validArticles.length);
     }
 
-    /* ── CONTROLLER ─────────────────────────────────────── */
+    /* ── CONTROLLER ───────────────────────────────────────── */
 
     function updateView() {
-      const sorted = sortData(data, sortSelect.value);
-      renderArticles(sorted);
+      showLoading();
+
+      setTimeout(() => {
+        const sorted = sortData(data, sortSelect.value);
+        renderArticles(sorted);
+      }, 300);
     }
 
-    /* ── INIT ───────────────────────────────────────────── */
+    /* ── INIT ─────────────────────────────────────────────── */
 
     function init() {
       sortSelect.addEventListener("change", updateView);
