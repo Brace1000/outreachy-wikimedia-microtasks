@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>bobaigwa - Task 1 (Sorting + Validation)</title>
+  <title>bobaigwa - Task 1 (Refactored)</title>
 </head>
 <body>
 
@@ -19,8 +19,8 @@
   <div id="results"></div>
 
   <script>
-    /* ── INPUT ───────────────────────────────────────────── */
-    let data = [
+    /* ── DATA ───────────────────────────────────────────── */
+    const data = [
       {"page_id": 6682420, "creation_date": "2021-09-13", "title": "André Baniwa"},
       {"page_id": 4246775, "creation_date": "2013-12-10", "title": "Benki Piyãko"},
       {"page_id": 5882073, "creation_date": "2018-12-03", "title": "Célia Xakriabá"},
@@ -35,10 +35,16 @@
       {"page_id": 6549130, "creation_date": "2021-04-10", "title": "Zezico Guajajara"},
     ];
 
-    /* ── DATE FORMATTER ─────────────────────────────────── */
+    /* ── DOM REFERENCES ─────────────────────────────────── */
+    const resultsDiv = document.getElementById("results");
+    const sortSelect = document.getElementById("sort");
+
+    /* ── UTILITIES ───────────────────────────────────────── */
+
     function formatDate(dateStr) {
       const [year, month, day] = dateStr.split("-").map(Number);
       const date = new Date(year, month - 1, day);
+
       return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -46,7 +52,6 @@
       });
     }
 
-    /* ── DATA VALIDATION (NEW - Contribution 5) ─────────── */
     function isValidArticle(article) {
       return (
         article &&
@@ -57,56 +62,67 @@
       );
     }
 
-    /* ── SORTING FUNCTION (Contribution 4) ─────────────── */
     function sortData(data, order) {
       return [...data].sort((a, b) => {
         const dateA = new Date(a.creation_date);
         const dateB = new Date(b.creation_date);
+
         return order === "newest" ? dateB - dateA : dateA - dateB;
       });
     }
 
-    /* ── RENDER FUNCTION ───────────────────────────────── */
-    const resultsDiv = document.getElementById("results");
+    /* ── DOM CREATION ───────────────────────────────────── */
 
-    function renderArticles(data) {
+    function createArticleElement(article) {
+      const p = document.createElement("p");
+
+      p.textContent =
+        `Article "${article.title}" (Page ID ${article.page_id}) was created at ${formatDate(article.creation_date)}.`;
+
+      return p;
+    }
+
+    /* ── RENDER LOGIC ───────────────────────────────────── */
+
+    function clearResults() {
       resultsDiv.innerHTML = "";
+    }
 
-      data.forEach(article => {
-        // Apply validation
-        if (!isValidArticle(article)) {
-          console.warn("Invalid article skipped:", article);
-          return;
-        }
+    function showEmptyState() {
+      resultsDiv.textContent = "No valid articles to display.";
+    }
 
-        const formattedDate = formatDate(article.creation_date);
+    function renderArticles(list) {
+      clearResults();
 
-        const p = document.createElement("p");
-        p.textContent =
-          `Article "${article.title}" (Page ID ${article.page_id}) was created at ${formattedDate}.`;
+      const validArticles = list.filter(isValidArticle);
 
-        resultsDiv.appendChild(p);
+      validArticles.forEach(article => {
+        const element = createArticleElement(article);
+        resultsDiv.appendChild(element);
       });
 
-      // Fallback if no valid data
-      if (resultsDiv.children.length === 0) {
-        resultsDiv.textContent = "No valid articles to display.";
+      if (validArticles.length === 0) {
+        showEmptyState();
       }
     }
 
-    /* ── EVENT HANDLING ────────────────────────────────── */
-    const sortSelect = document.getElementById("sort");
+    /* ── CONTROLLER ─────────────────────────────────────── */
 
     function updateView() {
       const sorted = sortData(data, sortSelect.value);
       renderArticles(sorted);
     }
 
-    sortSelect.addEventListener("change", updateView);
+    /* ── INITIALIZATION ─────────────────────────────────── */
 
-    // Initial render
-    updateView();
+    function init() {
+      sortSelect.addEventListener("change", updateView);
+      updateView();
+    }
 
+    init();
   </script>
+
 </body>
 </html>
