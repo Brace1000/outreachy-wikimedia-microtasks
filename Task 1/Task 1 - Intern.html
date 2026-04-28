@@ -2,18 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>bobaigwa - Task 1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>bobaigwa - Task 1 (Sorting Added)</title>
 </head>
 <body>
 
   <h1>bobaigwa - Task 1</h1>
 
+  <!-- NEW: Sorting Control -->
+  <label for="sort">Sort by date: </label>
+  <select id="sort">
+    <option value="newest">Newest First</option>
+    <option value="oldest">Oldest First</option>
+  </select>
+
   <div id="results"></div>
 
   <script>
-
-    /* ── INPUT ────────────────────────────────────────────────────────────── */
+    /* ── INPUT ───────────────────────────────────────────── */
     let data = [
       {"page_id": 6682420, "creation_date": "2021-09-13", "title": "André Baniwa"},
       {"page_id": 4246775, "creation_date": "2013-12-10", "title": "Benki Piyãko"},
@@ -29,31 +35,55 @@
       {"page_id": 6549130, "creation_date": "2021-04-10", "title": "Zezico Guajajara"},
     ];
 
-
-    // Converts "YYYY-MM-DD" → "Month Day, Year"
-    // We split manually instead of using `new Date()` to avoid timezone
-  
+    /* ── DATE FORMATTER ─────────────────────────────────── */
     function formatDate(dateStr) {
       const [year, month, day] = dateStr.split("-").map(Number);
-      const date = new Date(year, month - 1, day); // local midnight — no offset shift
+      const date = new Date(year, month - 1, day);
       return date.toLocaleDateString("en-US", {
-        year:  "numeric",
+        year: "numeric",
         month: "long",
-        day:   "numeric",
+        day: "numeric",
       });
     }
 
+    /* ── SORTING FUNCTION (NEW) ─────────────────────────── */
+    function sortData(data, order) {
+      return [...data].sort((a, b) => {
+        const dateA = new Date(a.creation_date);
+        const dateB = new Date(b.creation_date);
+        return order === "newest" ? dateB - dateA : dateA - dateB;
+      });
+    }
+
+    /* ── RENDER FUNCTION ───────────────────────────────── */
     const resultsDiv = document.getElementById("results");
 
-    data.forEach(function (article) {
-      const formattedDate = formatDate(article.creation_date);
+    function renderArticles(data) {
+      resultsDiv.innerHTML = "";
 
-      const p = document.createElement("p");
-      p.textContent =
-        `Article "${article.title}" (Page ID ${article.page_id}) was created at ${formattedDate}.`;
+      data.forEach(article => {
+        const formattedDate = formatDate(article.creation_date);
 
-      resultsDiv.appendChild(p);
-    });
+        const p = document.createElement("p");
+        p.textContent =
+          `Article "${article.title}" (Page ID ${article.page_id}) was created at ${formattedDate}.`;
+
+        resultsDiv.appendChild(p);
+      });
+    }
+
+    /* ── EVENT HANDLING (NEW) ───────────────────────────── */
+    const sortSelect = document.getElementById("sort");
+
+    function updateView() {
+      const sorted = sortData(data, sortSelect.value);
+      renderArticles(sorted);
+    }
+
+    sortSelect.addEventListener("change", updateView);
+
+    // Initial render
+    updateView();
 
   </script>
 </body>
