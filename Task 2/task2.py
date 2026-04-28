@@ -13,7 +13,6 @@ DEFAULT_RETRIES = 3
 DEFAULT_THREADS = 10
 
 
-# 🔹 CLI Arguments
 def parse_args():
     parser = argparse.ArgumentParser(description="URL Status Checker")
 
@@ -25,7 +24,6 @@ def parse_args():
     return parser.parse_args()
 
 
-# 🔹 Logging setup
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -136,6 +134,8 @@ def main():
 
     urls = read_urls(args.input)
     results = []
+    total = len(urls)
+    completed = 0
 
     with ThreadPoolExecutor(max_workers=args.threads) as executor:
         futures = [
@@ -144,7 +144,15 @@ def main():
         ]
 
         for future in as_completed(futures):
-            results.append(future.result())
+            result = future.result()
+            results.append(result)
+
+            completed += 1
+            progress = (completed / total) * 100
+
+            print(f"\rProcessed: {completed}/{total} ({progress:.1f}%)", end="")
+
+    print()  # newline after progress
 
     save_results(results, args.output)
     print_summary(results)
